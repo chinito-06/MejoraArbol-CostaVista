@@ -11,7 +11,10 @@ import model.*;
 //   3) Trazabilidad           -> usa la Pila (registrar y deshacer movimientos).
 //   4) Conexion de ubicaciones -> usa el Grafo (camino mas corto en el deposito).
 //   5) Inventario critico      -> usa la Cola de Prioridad (producto con menos stock).
-public class CentroLogistico { 
+//   6) Reporte de reposicion   -> usa el Arbol Binario de Busqueda (MEJORA):
+//      indexa los productos por stock y permite pedir todos los que estan por
+//      debajo de un umbral, ya ordenados de menor a mayor.
+public class CentroLogistico {
     // Se usa para invertir la prioridad: menos stock = mas urgente. Como la
     // cola pone la mayor prioridad al frente, la prioridad es TOPE - stock.
     private int TOPE_PRIORIDAD = 100000;
@@ -22,6 +25,8 @@ public class CentroLogistico {
     private Pila<Movimiento> trazabilidad;
     private GrafoMatrizAdyacencia<Ubicacion> mapaDeposito;
     private ColaPrioridad<Producto> inventarioCritico;
+    // MEJORA: indice de productos por stock. clave = stock, id = codigo.
+    private Arbol<Producto> arbolStock;
 
     public CentroLogistico(int capacidad) {
         this.productos = new Diccionario<String, Producto>(capacidad);
@@ -30,6 +35,7 @@ public class CentroLogistico {
         this.trazabilidad = new Pila<Movimiento>(capacidad);
         this.mapaDeposito = new GrafoMatrizAdyacencia<Ubicacion>(capacidad, false);
         this.inventarioCritico = new ColaPrioridad<Producto>(capacidad);
+        this.arbolStock = new Arbol<Producto>();
     }
 
     // ----- Objetivo 1: Localizacion de stock (Diccionario) -----
@@ -44,6 +50,9 @@ public class CentroLogistico {
         codigosUsados.insertar(codigo);
         productos.insertar(codigo, producto);
         inventarioCritico.insertar(producto, TOPE_PRIORIDAD - producto.obtenerStock());
+        // MEJORA: se indexa en el arbol por stock. El id es el codigo, que el
+        // Conjunto ya garantizo que es unico.
+        arbolStock.insertar(producto.obtenerStock(), codigo, producto);
         System.out.println("Producto agregado: " + producto);
     }
 
@@ -119,9 +128,11 @@ public class CentroLogistico {
             System.out.println("Error: el stock no puede quedar negativo --> no se aplico el cambio");
             return;
         }
-        trazabilidad.apilar(new Movimiento("ACTUALIZAR_STOCK", codigo, p.obtenerStock()));
-        p.establecerStock(p.obtenerStock() + cantidad);
+        int stockPrevio = p.obtenerStock();
+        trazabilidad.apilar(new Movimiento("ACTUALIZAR_STOCK", codigo, stockPrevio));
+        p.establecerStock(stockPrevio + cantidad);
         reordenarInventarioCritico(p);
+        reindexarArbolStock(stockPrevio, p);
         System.out.println("Stock actualizado: " + p);
     }
 
@@ -135,8 +146,10 @@ public class CentroLogistico {
         if (p == null) {
             return;
         }
+        int stockPrevio = p.obtenerStock();
         p.establecerStock(m.obtenerStockPrevio());
         reordenarInventarioCritico(p);
+        reindexarArbolStock(stockPrevio, p);
         System.out.println("Movimiento deshecho: " + p);
     }
 
@@ -145,6 +158,15 @@ public class CentroLogistico {
     private void reordenarInventarioCritico(Producto p) {
         inventarioCritico.eliminarElemento(p);
         inventarioCritico.insertar(p, TOPE_PRIORIDAD - p.obtenerStock());
+    }
+
+    // MEJORA: el stock es la clave del arbol, asi que al cambiar hay que
+    // reubicar el nodo. Como el arbol no sabe modificar una clave, se elimina
+    // el nodo con la clave vieja y se reinserta con la nueva. Es el mismo
+    // patron que reordenarInventarioCritico.
+    private void reindexarArbolStock(int stockPrevio, Producto p) {
+        arbolStock.eliminar(stockPrevio, p.obtenerCodigo());
+        arbolStock.insertar(p.obtenerStock(), p.obtenerCodigo(), p);
     }
 
     public void mostrarTrazabilidad() {
@@ -181,5 +203,31 @@ public class CentroLogistico {
 
     public void mostrarInventarioCritico() {
         inventarioCritico.mostrar();
+    }
+
+    // ----- MEJORA: Reporte de reposicion (Arbol Binario de Busqueda) -----
+
+    // Muestra todos los productos cuyo stock esta entre 0 y el umbral, ordenados
+    // de menor a mayor. Sirve para armar la orden de reposicion del dia.
+    // La Cola de Prioridad solo da EL producto mas critico; el arbol da TODOS
+    // los que estan por debajo del umbral, y sin recorrer el catalogo entero:
+    // el recorrido inorden podado no baja a las ramas donde no puede haber
+    // claves del rango.
+    public void listarProductosParaReponer(int umbral) {
+        if (umbral < 0) {
+            System.out.println("Error: el umbral de stock no puede ser negativo");
+            return;
+        }
+        System.out.println("Productos con stock entre 0 y " + umbral + " (de menor a mayor):");
+        arbolStock.listarEnRango(0, umbral);
+    }
+
+    // Muestra el catalogo completo ordenado por stock ascendente. Es el
+    // recorrido inorden del arbol: la propiedad del ABB lo devuelve ordenado
+    // sin necesidad de ordenar nada.
+    public void mostrarCatalogoPorStock() {
+        System.out.print("Catalogo ordenado por stock: ");
+        arbolStock.mostrarInorden(arbolStock.devolverRaiz());
+        System.out.println();
     }
 }

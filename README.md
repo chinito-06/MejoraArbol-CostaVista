@@ -183,12 +183,3 @@ Reposicion con stock <= 20 (P002 bajo a 6 al despachar PED-1):
 | Reindexado al deshacer | `deshacerUltimoMovimiento()` | P004 vuelve al reporte | ✓ |
 | Sincronización tras despacho | `despacharProximoPedido()` | P002 aparece con stock 6 | ✓ |
 
----
-
-## 7. Limitaciones conocidas
-
-Se dejan explícitas porque son decisiones de diseño, no errores:
-
-- **El ABB no se balancea.** En el peor caso —claves insertadas en orden, o muchos productos con el mismo stock encadenados a la derecha— degenera hacia una lista y las operaciones pasan a O(n). Un **AVL** lo evitaría rebalanceando con rotaciones. No se usó porque las rotaciones **no preservan la invariante "claves iguales a la derecha"** de la que depende nuestro `eliminar(clave, id)`: una rotación a izquierda puede dejar una clave igual en el subárbol izquierdo. Para usar AVL habría que volver la clave única, ordenando por stock y desempatando por código.
-- **Entre claves iguales el orden no es estable.** Tras reinsertar un producto, su posición relativa a otro con el mismo stock puede cambiar. El ABB no promete orden entre claves iguales.
-- **`listarEnRango` imprime en vez de devolver los resultados**, en línea con el resto del proyecto. Para encadenar el reporte con otra operación (por ejemplo, generar la orden de compra automáticamente) habría que devolver los productos en lugar de mostrarlos.

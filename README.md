@@ -116,16 +116,6 @@ Archivos de la mejora (dentro de `Mejorarbol/`):
 - `service/CentroLogistico.java` — atributo `arbolStock`, `reindexarArbolStock(...)`, `listarProductosParaReponer(...)`, `mostrarCatalogoPorStock()`.
 - `app/Main.java` — casos de prueba de la mejora (incluye P004, con el mismo stock que P002, para ejercitar las claves repetidas).
 
-El proyecto es autónomo: compila y corre por sí solo.
-
-### Cómo compilar y ejecutar
-
-```
-javac -d bin <archivos .java del proyecto>
-java -cp bin app.Main
-```
-
----
 
 ## 6. Evidencia de ejecución
 
